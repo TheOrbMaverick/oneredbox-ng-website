@@ -7,7 +7,9 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_mail import Mail, Message
 from flask import jsonify, flash, session
 from datetime import datetime, timedelta
+from PIL import Image
 
+import re
 import os
 import json
 import bcrypt
@@ -59,10 +61,6 @@ def load_user(user_id):
 
     if user is not None:
         return User(user['client_id'], user['client_email'], user['first_name'])
-
-
-
-amountPaid = 0
 
 # a decorator with an index function in the decorator this whole section is called routing
 @app.route('/')
@@ -140,8 +138,9 @@ def signup():
         confirmation_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
         #adding query to insert into database
-        cur.execute('''INSERT INTO clients (first_name, last_name, client_email, date_of_birth, password, confirmation_code, reset_token, forgot_mail, phone_number, client_pic_path) 
-                    VALUES (%s, %s, %s, %s, %s, %s, null, null null, null)''', (firstname, lastname, email, dateOfBirth, hashedPassword, confirmation_code))
+        cur.execute('''INSERT INTO clients (first_name, last_name, client_email, date_of_birth, password, confirmation_code, reset_token, phone_number, client_pic_path) 
+                SELECT %s, %s, %s, %s, %s, %s, null, null, null
+                WHERE NOT EXISTS (SELECT 1 FROM clients WHERE client_email = %s)''', (firstname, lastname, email, dateOfBirth, hashedPassword, confirmation_code, email))
         cnx.commit()
         
 
@@ -177,20 +176,31 @@ def dashboard():
                 'project_desc': item['project_desc'],
                 'contract_sum': item['contract_sum'],
                 'amount_paid': item['amount_paid'],
+                'amount_due': item['contract_sum'] - item['amount_paid'],
                 'proj_image_path': item['proj_image_path'],
                 'updates': []
             })
         for project in unique_projects:
-            project['amount_due'] = project['contract_sum'] - project['amount_paid']
             if project['project_id'] == item['project_id']:
                 project['updates'].append({
                     'update_id': item['update_id'],
                     'update_desc': item['update_desc'],
                     'proj_status': "STARTED" if item['proj_status'] == 0 else "IN PROGRESS" if item['proj_status'] == 1 else "COMPLETED" if item['proj_status'] == 2 else item['proj_status']
                 })
-    print(unique_projects)
+
+
+    cur.execute("SELECT client_pic_path FROM clients WHERE client_id = %s", (current_user.id,))
+    picpath_dict = cur.fetchone()
+    user_photo = picpath_dict['client_pic_path']
+
+    if user_photo is not None:
+        profilepic = user_photo.replace("static/", "")
+    else:
+        profilepic = "images/white_circle.png"
+
+    
     #write code to bring up an alert box if the project is empty.
-    return render_template("dashboard.html", unique_projects=unique_projects, name=name)
+    return render_template("dashboard.html", unique_projects=unique_projects, name=name, profilepic = profilepic)
 
 
 @app.route('/projects')
@@ -211,6 +221,7 @@ def get_current_user():
 @app.route('/newproject', methods = ['GET', 'POST'])
 def newproject():
     client_id = current_user.id
+    email = current_user.email
     req = request.get_json()
     spaces = req['spaces']
     totalArea = calculateArea(spaces)
@@ -223,7 +234,8 @@ def newproject():
     study = spaces['Study']
     twBath = spaces['Toilet with bath']
     tWoBath = spaces['Toilet without bath']
-    projDesc = "Your project description here"
+    amountPaid = 0
+    
 
     bedrooms = "bedroom" if bedroom == 1 else "bedrooms" if bedroom > 1 else ""
     commercial_spaces = "person commercial space" if commercial == 1 else "people commercial space" if commercial > 1 else ""
@@ -271,12 +283,29 @@ def newproject():
                 VALUES (%s, %s, %s)''', (update_desc, proj_status, project_id))
     cnx.commit()
 
-    print(spaces)
-    print(totalArea)
-    print(totalCost)
+    # Send a confirmation email to the user
+    msg = Message('Your new project', sender='hello@oneredbox.ng', recipients=[email])
+    msg.body = f'''
+                Hello {current_user.name}!,
+
+                We are excited that you have created a new project. 
+
+                Your project id is: {project_id}
+
+                Your project description is: {projDesc}
+
+                Please reply to this email with any further details about the project that you would like to share and someone from our team will reach out to you.
+
+                Customer service
+                Oneredbox.ng
+                '''
+
+    msg.body = re.sub(r'^( {4})+', '', msg.body, flags=re.MULTILINE)
+    mail.send(msg)
 
     # Redirect user to dashboard
     return redirect(url_for('dashboard'))
+
 
 def calculateArea(spaces):
     bedrooom = spaces['Bedroom'] * 19.2
@@ -295,8 +324,8 @@ def calculateArea(spaces):
 
 def calculateCost(area):
     naira = area * 370000
-    cost = round(naira / 720)
-    return cost
+    # cost = round(naira / 720)
+    return naira
 
 @app.route('/confirm_email')
 def confirm_email():
@@ -324,6 +353,7 @@ def generate_token(email, length=30):
     random_string = ''.join(random.choice(chars) for i in range(length))
     return f'{email}-{random_string}'
 
+
 # Route for the forgot password form
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
@@ -335,12 +365,13 @@ def forgot_password():
         cur = cnx.cursor(dictionary=True)
         cur.execute("SELECT client_email FROM clients where client_email = %s", (forgottenM,))
         user = cur.fetchone()
-        email = user['client_email']
+        
         # If not, display an error message
         if not user:
-            flash("no user found")
+            flash("No user with that e-mail found")
             return redirect(url_for('login'))
         else:
+            email = user['client_email']
             # Otherwise, generate a unique token and store it in your database, associated with the user's account
             token = generate_token(email)
             # Send an email to the user with a link to the password reset page, along with the token in the URL parameters
@@ -394,16 +425,76 @@ def reset_password(token):
     return render_template('reset_password.html', token=token)
 
 
+@app.route('/update_database', methods=['POST'])
+def update_database():
+    data =request.get_json()
+    projectId = data['jsonProjectId']
+    paidAmount = data['paymentAmount']
+
+    cur = cnx.cursor(dictionary=True)
+    cur.execute("SELECT * FROM projects WHERE project_id = %s", (projectId,))
+    project = cur.fetchone()
+    
+    if project:
+        if project['amount_paid'] == 0:
+            totalAmountPaid = paidAmount
+        else:
+            totalAmountPaid = project['amount_paid'] + paidAmount
+
+        # Update the confirmed column 
+        cur.execute("UPDATE projects SET amount_paid = %s WHERE project_id = %s", (totalAmountPaid, projectId))
+        cnx.commit()
+
+        return "Payment updated"
+    else:
+        print(f"No project found for project_id {projectId}")
+        return "Project not found"
+    
+
+@app.route('/update_profile', methods=['POST'])
+def update_profile():
+    
+    phoneNumber = request.form['phoneNumber']
+    file = request.files.get('profilePic')
+
+    if file:
+
+        filename = f"user_{current_user.id}.jpg"
+
+        # Save uploaded image to disk
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+
+        # Open the image and compress it
+        with Image.open(filepath) as img:
+            img.save(filepath, optimize=True, quality=50)
+
+        # Update the user's profile with the new data
+        cur = cnx.cursor(dictionary=True)
+        cur.execute("UPDATE clients SET client_pic_path = %s, phone_number = %s WHERE client_id = %s", (filepath, phoneNumber, current_user.id))
+        cnx.commit()
+
+        return jsonify({"message": "Profile updated"})
+    else:
+        cur = cnx.cursor(dictionary=True)
+        cur.execute("UPDATE clients SET phone_number = %s WHERE client_id = %s", (phoneNumber, current_user.id))
+        cnx.commit()
+
+        return jsonify({"message": "Number updated"})
+
+
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():
     # Clear the session
     session.clear()
-    flash("You have been logged out successfully", "success")
+
     # Redirect to the home page
     return redirect(url_for('index'))
 
+
 #if the name arugment is same as main run the app
 if __name__ == "__main__":
+    app.config['UPLOAD_FOLDER'] = 'static/userpics'
     app.run(debug = True)
 
 

@@ -4,6 +4,7 @@ var counter = 0;
 window.addEventListener('load', () => {
     const dashpage = document.querySelector("#dashboardpage");
     const indexpage = document.querySelector("#homepage");
+    $('#myModal').modal('show');
 
     if(document.title === "Oneredbox - Sign up"){
         signuppage();
@@ -26,29 +27,77 @@ function dashboardpage () {
     const addProjectbtn = document.querySelector(".add-product")
     const addProjectDialog = document.querySelector(".box")
     const backdrop = document.querySelector(".backdrop");
-    const addFunds = document.querySelector("#add-funds");
+    const addFunds = document.querySelectorAll(".funds_required");
     const submitButton = document.querySelector("#submit-project");
     const sideMenu = document.querySelector("aside")
     const menuBtn = document.querySelector("#menu_btn") //same things
     const closeBtn = document.getElementById("close-btn") //same things
+    const payAlertBox = document.querySelector('#paymentForm');
+    const profileForm = document.querySelector('#profileForm');
+    const userPhoto = document.querySelector('.profile-photo');
+    const profilePicInput = document.getElementById("profilePic");
+    const profilePicImg = document.querySelector("#profilePic + label img");
+    const editProBtn = document.getElementById("editProfile");
+    const phoneNumber = document.getElementById('phoneNumber');
+    
+
+
+    userPhoto.addEventListener('click', () => {
+        profileForm.style.display = "flex";
+        backdrop.style.display = "flex";
+    });
+
+
+    profilePicInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          profilePicImg.src = reader.result;
+        };
+    });
+
+    
+    editProBtn.addEventListener('click', () => {
+        const formData = new FormData();
+        formData.append('profilePic', profilePicInput.files[0]);
+        formData.append('phoneNumber', phoneNumber.value);
+    
+        fetch('/update_profile', {
+            method: "POST",
+            body: formData,
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            console.log(data);
+            console.log(formData);
+        })
+        .catch((error) => console.error(error));
+
+        profileForm.style.display = "none";
+        backdrop.style.display = "none";
+    });
+
 
     //toggle theme
     themeToggler.addEventListener('click', () => {
         document.body.classList.toggle('light-theme-varibles');
-        themeToggler.querySelector('span:nth-child(2)').classList.toggle('active')
-        themeToggler.querySelector('span:nth-child(1)').classList.toggle('active')
-    })
+        themeToggler.querySelector('span:nth-child(2)').classList.toggle('active');
+        themeToggler.querySelector('span:nth-child(1)').classList.toggle('active');
+    });
 
     //add project
     addProjectbtn.onclick = function() {
         addProjectDialog.style.display = "flex";
-        backdrop.style.display = "flex"
+        backdrop.style.display = "flex";
     }
     
-    // making everything blankish
+    // making everything disapear on clicking blank areas
     backdrop.addEventListener('click', () => {
         addProjectDialog.style.display = "none";
         backdrop.style.display = "none";
+        payAlertBox.style.display = "none";
+        profileForm.style.display = "none";
     });
 
     submitButton.addEventListener('click', function(event) {
@@ -64,6 +113,7 @@ function dashboardpage () {
             body: JSON.stringify(data),
             headers: {'Content-Type': 'application/json'}
         })
+        window.location.reload()
     })
 
     //open side bar
@@ -133,33 +183,144 @@ function dashboardpage () {
         });
     });
 
-    fetch('/get_current_user')
-        .then(response => response.json())
-        .then(user => {
-            addFunds.addEventListener('click', payWithPaystack);
-            console.log(user.id, user.email);
-            //paystack payments
+    function testProgress() {
+        // Get the element with the id "unique-projects-data"
+        const uniqueProjectsDataElement = document.getElementById('unique-projects-data');
+
+        // Parse the JSON data stored in the element
+        const uniqueProjects = JSON.parse(uniqueProjectsDataElement.textContent);
+
+        // Loop through each project in the JSON data
+        uniqueProjects.forEach((project, index) => {
+            // Get the amount due and amount paid elements for this project
+            const amountDuePercElement = document.querySelectorAll('#amount_due_perc')[index];
+            const amountPaidPercElement = document.querySelectorAll('#amount_paid_perc')[index];
             
-            function payWithPaystack() {
-                let handler = PaystackPop.setup({
-                    key: 'pk_test_07b310fb8ae27769a5269f48247fa5e59778b176', // Replace with your public key
-                    email: user.email,
-                    amount: 100 * 100,
-                    ref: ''+Math.floor((Math.random() * 1000000000) + 1), // generates a pseudo-unique reference. Please replace with a reference you generated. Or remove the line entirely so our API will generate one for you
-                    // label: "Optional string that replaces customer email"
-                    onClose: function(){
-                    alert('Window closed.');
-                    },
-                    callback: function(response){
-                    let message = 'Payment complete! Reference: ' + response.reference;
-                    alert(message);
-                    }
-                });
-        
-                handler.openIframe();
-                }
+
+            // Calculate the percentage values for amount due and amount paid
+            const amountDuePerc = Math.round((project.amount_due / project.contract_sum) * 100);
+            const amountPaidPerc = Math.round((project.amount_paid / project.contract_sum) * 100);
+
+            // Set the text content of the percentage elements to the calculated values
+            amountDuePercElement.textContent = `${amountDuePerc}%`;
+            amountPaidPercElement.textContent = `${amountPaidPerc}%`;
+            
+        });
+    }
+    testProgress();
+
+    function progressbar() {
+
+        const fundsPaid = document.querySelectorAll('main .insights .available_funds svg circle');
+        const fundsReq = document.querySelectorAll('main .insights .funds_required svg circle');
+
+        fundsPaid.forEach((circle, index) => {
+            var uniqueProjects = JSON.parse(document.getElementById("unique-projects-data").innerHTML);
+            contract_sum = uniqueProjects[index]['contract_sum'];
+            amount_paid = uniqueProjects[index]['amount_paid'];
+            amount_paid_perc = amount_paid / (contract_sum /100);
+            progresspaid = 223 - (223 * (amount_paid_perc/100));
+            const paidAmount = progresspaid.toString();
+            circle.style.setProperty("--paidAmount", paidAmount);
         });
 
+        fundsReq.forEach((circle, index) => {
+            var uniqueProjects = JSON.parse(document.getElementById("unique-projects-data").innerHTML);
+
+            contract_sum = uniqueProjects[index]['contract_sum'];
+            amount_due = uniqueProjects[index]['amount_due'];
+
+            amount_req_perc = amount_due / (contract_sum /100);
+
+            progressreq = 223 - (223 * (amount_req_perc/100));
+            const reqAmount = progressreq.toString();
+            circle.style.setProperty("--reqAmount", reqAmount);
+        });
+    }
+    
+    progressbar();
+
+    addFunds.forEach((fund, index) => {
+        var uniqueProjects = JSON.parse(document.getElementById("unique-projects-data").innerHTML);
+    
+        fund.addEventListener('click', () => {
+            var projectId = uniqueProjects[index]['project_id'];
+            console.log(projectId);
+    
+            // Show the dialog box
+            payAlertBox.style.display = 'block';
+    
+            //backdrop
+            backdrop.style.display = 'block';
+    
+            fetch('/get_current_user')
+            .then(response => response.json())
+            .then(user => {
+                const pay = document.getElementById('payButton');
+                var payInput = document.getElementById('payamount');
+    
+                payInput.addEventListener('input', function() {
+                    var value = this.value;
+                    var formattedValue = value.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                    this.value = formattedValue;
+                    var payValue = parseInt(payInput.value.replace(/\D/g, ""));
+                    pay.addEventListener('click', payWithPaystack);
+
+                    
+
+                    //paystack payments
+                    function payWithPaystack(event) {
+                        event.preventDefault();
+
+                        // Close pay dialogue and backdrop
+                        payAlertBox.style.display = "none";
+                        backdrop.style.display = "none";
+
+                        let handler = PaystackPop.setup({
+                            
+                            key: 'pk_test_07b310fb8ae27769a5269f48247fa5e59778b176', // Replace with your public key
+                            email: user.email,
+                            amount: payValue * 100,
+                            ref: ''+Math.floor((Math.random() * 1000000000) + 1), // generates a pseudo-unique reference. Please replace with a reference you generated. Or remove the line entirely so our API will generate one for you
+                            // label: "Optional string that replaces customer email"
+                            onClose: function(){
+                            alert('Window closed.');
+                            },
+                            callback: function(response){
+                                let message = 'Payment complete! Reference: ' + response.reference;
+                                alert(message);
+        
+                                // Update the database with the payment amount and project ID
+                                fetch('/update_database', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        jsonProjectId: projectId,
+                                        paymentAmount: payValue
+                                    })
+                                })
+                                .then(response => {
+                                    // Handle response from server
+                                    window.location.reload()
+                                    console.log(response)
+                                })
+                                .catch(error => {
+                                    // Handle error
+                                    console.log(error)
+                                });
+                            }
+                        });
+                        handler.openIframe();
+                    }
+                });
+                
+            });
+        })
+    
+    })
+    
 }
 
 function freeQuotePage() {

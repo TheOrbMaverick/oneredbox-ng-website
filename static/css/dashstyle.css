@@ -2,6 +2,7 @@
     --color_primary: #d79645;
     --color_border: #dfa04f;
     --color_dark: #171c1d;
+    --color_slightly_lighter: #171c1d;
     --color_lgrey: #8f8f8f;
     --color_alert: #aa1a1a;
     --color_success: #2ac31f;
@@ -39,7 +40,7 @@ body {
     width: 100vw;
     height: 100vh;
     font-size: .88rem;
-    background: var(--color_dark);
+    background: var(--color_slightly_lighter);
     font-family: 'Open Sans', sans-serif;
     user-select: none;
     overflow-x: hidden;
@@ -93,6 +94,11 @@ small {
 
 .text-muted {
     color: #8f8f8f;
+}
+
+.text-bolder-muted {
+    color: var(--color-white);
+    font-weight: 500;
 }
 
 p {
@@ -287,7 +293,6 @@ main .insights .progress {
 }
 
 main .insights svg {
-    
     width: 7rem;
     height: 7rem;
 }
@@ -298,26 +303,38 @@ main .insights svg circle {
     stroke-width: 14;
     stroke-linecap: round;
     transform: translate(5px, 5px);
-    stroke-dasharray: 110;
-    stroke-dashoffset: 92;
+    /* stroke-dasharray: 110;
+    stroke-dashoffset: 0; */
 }
 
 main .insights .contract_sum svg circle {
-    stroke-dashoffset: -30;
-    stroke-dasharray: 200;
+    stroke-dasharray: 223;
     stroke: var(--color_primary);
+    animation: anim 2s linear forwards;
 }
 
 main .insights .available_funds svg circle {
-    stroke-dashoffset: 20;
-    stroke-dasharray: 80;
+    stroke-dasharray: 223;
     stroke: var(--color_success);
+    animation: remainAnim 2s linear forwards;
 }
 
 main .insights .funds_required svg circle {
-    stroke-dashoffset: 35;
-    stroke-dasharray: 100;
+    stroke-dasharray: 223;
     stroke: var(--color_alert);
+    animation: requiredAnim 2s linear forwards;
+}
+
+@keyframes remainAnim {
+    100%{
+        stroke-dashoffset: var(--paidAmount);
+    }
+}
+
+@keyframes requiredAnim {
+    100%{
+        stroke-dashoffset: var(--reqAmount);
+    }
 }
 
 main .insights .progress .number {
@@ -438,13 +455,29 @@ main table {
     text-align: right;
 }
 
-
 .right .top .profile .profile-photo{
     display: flex;
     padding: auto;
     width: 5rem;
     height: 5rem;
-    margin-top: -1.5rem;
+    margin-top: -.5rem;
+    margin-right: .5rem;
+    cursor: pointer;
+    border-radius: 50%;
+    Background-position:center;
+    Background-size:cover;
+}
+
+.right .top .profile .profile-photo img {
+    display: flex;
+    padding: auto;
+    width: 5rem;
+    height: 5rem;
+    margin-top: 0rem;
+    cursor: pointer;
+    border-radius: 50%;
+    Background-position:center;
+    Background-size:cover;
 }
 
 /************  PROJECTS  **************/
@@ -521,6 +554,170 @@ main table {
 
 .right .sales-analytics .add-product div h3 {
     font-weight: 600;
+}
+
+/************** PROFILE *******************/
+
+#profileForm {
+    display: none;
+    height: 25rem;
+    width: 23rem;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    border-radius: 1rem;
+    background: var(--color_dark);
+    box-shadow: .5rem .5rem .5rem #040404;
+    z-index: 36;
+    left: 40%;
+    top: 30%;
+}
+
+.profilePic-label {
+    width: 6rem;
+    height: 6rem;
+    border-radius: 50%;
+    cursor: pointer;
+    margin-left: 7rem;
+    top: 10%;
+}
+
+.edit-profile-photo {
+    width: 6rem;
+    height: 6rem;
+    border-radius: 50%;
+    cursor: pointer;
+    margin-left: 7rem;
+    top: 10%;
+    transition: 1s;
+}
+
+.edit-profile-photo:hover {
+    transform: scale(1.2);
+    background-color: var(--color_lgrey);
+    src: var(--box-shadow);
+}
+
+#editProfile {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    background-image: linear-gradient(to left top, #d79645, #dfa04f, #e7aa58, #f0b562, #f8bf6c);
+    margin-top: 2rem;
+    border-radius: 4rem;
+    height: 2.5rem;
+    width: 8rem;
+    margin-left: 7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .4s;
+    border: 1px solid white;
+}
+
+#editProfile:hover {
+    transform: scale(1.2);
+    cursor: pointer;
+    color: #222828;
+}
+/****************** PAYMENT ********************/
+
+#payalert {
+    margin-left: 2rem;
+    margin-bottom: 2rem;
+}
+
+#paymentForm {
+    display: none;
+    height: 16rem;
+    width: 23rem;
+    padding-top: 2rem;
+    position: fixed;
+    border-radius: 1rem;
+    background: var(--color_dark);
+    box-shadow: .5rem .5rem .5rem #040404;
+    z-index: 36;
+    left: 40%;
+    top: 40%;
+}
+
+.inputbox {
+    position: relative;
+    width: 18.75rem;
+    margin-top: 1rem;
+    margin-left: 2rem;
+}
+
+.inputbox input {
+    position: relative;
+    width: 100%;
+    padding: 20px 10px 10px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #171c1d;
+    font-size: 1em;
+    letter-spacing: .05em;
+    z-index: 10;
+}
+
+.inputbox span {
+    position: absolute;
+    left: 0;
+    padding: 2px 10px 10px;
+    font-size: 1.1em;
+    color: #8f8f8f;
+    pointer-events: none;
+    letter-spacing: .05em;
+    transition: 0.5s;
+}
+
+.inputbox input:valid ~ span,
+.inputbox input:focus ~ span {
+    color: #d79645;
+    transform: translateX(-10px) translateY(-15px);
+    font-size: 0.85em;
+}
+
+.inputbox i {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    background: #d79645;
+    border-radius: 4px;
+    transition: .5s;
+    pointer-events: none;
+    z-index: 9;
+}
+
+.inputbox input:valid ~ i,
+.inputbox input:focus ~ i {
+    height: 3rem;
+}
+
+#payButton {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    background-image: linear-gradient(to left top, #d79645, #dfa04f, #e7aa58, #f0b562, #f8bf6c);
+    margin-top: 2rem;
+    border-radius: 4rem;
+    height: 2rem;
+    width: 6rem;
+    margin-left: 8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .4s;
+    border: 1px solid white;
+}
+
+#payButton:hover {
+    transform: scale(1.2);
+    cursor: pointer;
+    color: #222828;
 }
 
 /*******************    MEDIA QUERIES    ***********************/
@@ -892,10 +1089,10 @@ main table {
     cursor: pointer;
 }
 
-
   /*********************   LIGHT THEME VARIABLES   *****************************/
 .light-theme-varibles {
     --color-background: linear-gradient(to right bottom, #ffffff, #dadada, #b5b6b6, #929393, #717272);
     --color-white: #171c1d;
     --color_dark: #ffffff;
+    --color_slightly_lighter: #ffffff;
 }

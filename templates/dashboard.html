@@ -47,11 +47,12 @@
             </div>
         </aside>
         <main>
+            <div id="unique-projects-data" style="display: none;">{{ unique_projects | tojson }}</div>
             {% for project in unique_projects %}
             <br>
             <h1>{{ project.project_desc }}</h1>
             <div class="date">
-                <input type="date">
+                <input type="date" name="created_date" value="{{ created_date }}" disabled>
             </div>
             <div class="insights" >
                 <!--------------FIRST------------------->
@@ -60,15 +61,13 @@
                     <div class="middle">
                         <div class="left">
                             <h3>Contract sum</h3>
-                            <h1>${{ "{:,}".format(project.contract_sum) }}</h1>
+                            <h1 class="contract_sum">&#8358; {{ "{:,}".format(project.contract_sum) }}</h1>
                         </div>
                         <div class="progress">
                             <svg>
                                 <circle cx="38" cy="38" r="36"></circle>
                             </svg>
-                            <div class="number">
-                                <p>81%</p>
-                            </div>
+                            <div class="number">100%</div>
                         </div>
                     </div>
                     <small class="text-muted">Last 24 hours</small>
@@ -78,35 +77,38 @@
                     <span class="material-symbols-sharp">bar_chart</span>
                     <div class="middle">
                         <div class="left">
-                            <h3>Funds available</h3>
-                            <h1>${{ "{:,}".format(project.amount_paid) }}</h1>
+                            <h3>Funds Paid</h3>
+                            <h1 class="funds_avail">&#8358; {{ "{:,}".format(project.amount_paid) }}</h1>
                         </div>
                         <div class="progress">
                             <svg>
                                 <circle cx="38" cy="38" r="36"></circle>
                             </svg>
                             <div class="number">
-                                <p>81%</p>
+                                <p id="amount_paid_perc"></p>
                             </div>
                         </div>
                     </div>
                     <small class="text-muted">Last 24 hours</small>
                 </div>
                 <!--------------THIRD------------------->
-                <div class="funds_required">
+                <div class="funds_required" data-project-id="{{ project.id }}">
                     <span class="material-symbols-sharp">stacked_line_chart</span>
                     <div class="middle">
                         <div class="left">
                             <h3>Amount Due</h3>
-                            <h1>${{ "{:,}".format(project.amount_due) }}</h1>
+                            <h1 class="amount_due">&#8358; {{ "{:,}".format(project.amount_due) }}</h1>
                         </div>
                         <div class="progress">
+                            <svg>
+                                <circle cx="38" cy="38" r="36"></circle>
+                            </svg>
                             <div class="number">
-                                <button class="add-funds" id="add-funds">ADD FUNDS</button>
+                                <p id="amount_due_perc"></p>
                             </div>
                         </div>
                     </div>
-                    <small class="text-muted">Last 24 hours</small>
+                    <small class="text-bolder-muted">Click here to add funds to your project</small>
                 </div>
             </div>
             <div class="recent_orders">
@@ -134,7 +136,6 @@
             </div>
             <br>
             {% endfor %}
-            
         </main>
         <div class="right">
             <!---------------   TOP OF RIGHT   --------------->
@@ -152,7 +153,11 @@
                         <small class="text-muted">Client</small>
                     </div>
                     <div class="profile-photo">
-                        <img src="../static/images/white_circle.png" alt="">
+                        {% if profilepic %}
+                            <img src="{{ url_for('static', filename = profilepic) }}" alt="">
+                        {% else %}
+                            <img src="{{ url_for('static', filename = 'images/white_circle.png') }}" alt="">
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -220,7 +225,34 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div>   
+        <form id="paymentForm">
+            <h2 id="payalert">ENTER AMOUNT</h2>
+            <div class="inputbox">
+                <input type="tel" id="payamount" required />
+                <span>Amount</span>
+                <i></i>
+            </div>
+            <div class="form-submit">
+                <button id="payButton"> PAY </button>
+            </div>
+        </form>
+        <form action="javascript:0" id="profileForm" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <input type="file" class="form-control" name="profilePic" id="profilePic" accept="image/*" style="display:none;">
+                <label for="profilePic" class="profilePic-label">
+                    <img class="edit-profile-photo" src="../static/images/white_circle.png" alt="">
+                </label>
+                <div class="inputbox">
+                    <input type="tel" id="phoneNumber" required />
+                    <span>Phone Number</span>
+                    <i></i>
+                </div>
+                <div class="form-submit">
+                    <button id="editProfile"> EDIT PROFILE </button>
+                </div>
+            </div>
+        </form>
         <div class="box">
             <div class="form">
                 <form class="project-form" action="#" method="POST">
