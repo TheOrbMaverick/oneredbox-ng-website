@@ -76,6 +76,7 @@ function dashboardpage () {
 
         profileForm.style.display = "none";
         backdrop.style.display = "none";
+        window.location.reload();
     });
 
 
