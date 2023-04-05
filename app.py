@@ -59,11 +59,10 @@ def load_user(user_id):
         'host': 'localhost',
         'database': "Oneredbox"
     }
-    cnx = mysql.connector.connect(**config)
+    lcnx = mysql.connector.connect(**config)
 
-    
     id_query = "SELECT * FROM clients WHERE client_id = %s"
-    with cnx.cursor(dictionary=True) as cur:
+    with lcnx.cursor(dictionary=True) as cur:
         cur.execute(id_query, (user_id, ))
         user = cur.fetchone()
 
@@ -134,6 +133,7 @@ def projectquote():
 @app.route('/signup', methods = ['GET', 'POST'])
 def signup():
     if request.method == 'POST':
+        cnx.reconnect()
         firstname = request.form['firstName']
         lastname = request.form['lastName']
         email = request.form['email']
@@ -150,7 +150,6 @@ def signup():
             cur.execute('''INSERT INTO clients (first_name, last_name, client_email, date_of_birth, password, confirmation_code, reset_token, phone_number, client_pic_path) 
                         VALUES (%s, %s, %s, %s, %s, %s, null, null, null)''', (firstname, lastname, email, dateOfBirth, hashedPassword, confirmation_code))
             cnx.commit()
-        
 
         # Send a confirmation email to the user
         confirm_link = url_for('confirm_email', email=email, code=confirmation_code, _external=True)
@@ -167,20 +166,7 @@ def signup():
 @app.route('/dashboard', methods = ['GET', 'POST'])
 @login_required
 def dashboard():
-    # try:
-    #     cur = cnx.cursor(dictionary=True)
-    # except mysql.connector.errors.OperationalError as err:
-    #     if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
-    #         print("Something is wrong with your user name or password")
-    #     elif err.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
-    #         print("Database does not exist")
-    #     else:
-    #         print("Error:", err)
-        
-    # # Attempt to reconnect to the database
-    # cnx.reconnect()
-    # cur = cnx.cursor(dictionary=True)
-    #query to join tables
+    
     query = '''
     SELECT * FROM clients
     JOIN projects ON clients.client_id = projects.client_id
@@ -203,6 +189,7 @@ def dashboard():
                 'amount_paid': item['amount_paid'],
                 'amount_due': item['contract_sum'] - item['amount_paid'],
                 'proj_image_path': item['proj_image_path'],
+                'date_added': item['date_added'],
                 'updates': []
             })
         for project in unique_projects:
@@ -245,6 +232,14 @@ def get_current_user():
 
 @app.route('/newproject', methods = ['GET', 'POST'])
 def newproject():
+    config = {
+        'user': 'root',
+        'password': 'myorbdbpass',
+        'host': 'localhost',
+        'database': "Oneredbox"
+    }
+    ncnx = mysql.connector.connect(**config)
+
     client_id = current_user.id
     email = current_user.email
     req = request.get_json()
@@ -293,10 +288,10 @@ def newproject():
     date_added = date.today()
 
     #adding query to insert into database
-    with cnx.cursor(dictionary=True) as cur:
+    with ncnx.cursor(dictionary=True) as cur:
         cur.execute('''INSERT INTO projects (project_desc, contract_sum, amount_paid, commercial, t_wo_bath, t_w_bath, study, kitchen, livingRm, bedroom, total_sq_area, proj_image_path, date_added, client_id) 
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, null, %s, %s)''', (projDesc, totalCost, amountPaid, commercial, tWoBath, twBath, study, kitchen, livrm, bedroom, totalArea, date_added, client_id))
-        cnx.commit()
+        ncnx.commit()
         # Get the project ID of the newly created project
         project_id = cur.lastrowid
 
@@ -305,10 +300,10 @@ def newproject():
     update_desc = "Project brief created"
     proj_status = 0
 
-    with cnx.cursor(dictionary=True) as cur:
+    with ncnx.cursor(dictionary=True) as cur:
         cur.execute('''INSERT INTO updates (update_desc, proj_status, project_id) 
                     VALUES (%s, %s, %s)''', (update_desc, proj_status, project_id))
-        cnx.commit()
+        ncnx.commit()
 
     # Send a confirmation email to the user
     msg = Message('Your new project', sender='hello@oneredbox.ng', recipients=[email])
@@ -329,6 +324,7 @@ def newproject():
 
     msg.body = re.sub(r'^( {4})+', '', msg.body, flags=re.MULTILINE)
     mail.send(msg)
+    ncnx.close()
 
     # Redirect user to dashboard
     return redirect(url_for('dashboard'))
@@ -356,16 +352,16 @@ def calculateCost(area):
 
 @app.route('/confirm_email')
 def confirm_email():
-    
+
     # Retrieve the email and confirmation code from the URL parameters
     email = request.args.get('email')
     code = request.args.get('code')
 
     # Check if the confirmation code is valid for this email
     with cnx.cursor(dictionary=True) as cur:
-        cur.execute("SELECT * FROM clients WHERE client_email = %s AND confirmation_code = %s", (email, code))
-
-    user = cur.fetchone()
+        cur.execute("SELECT client_id FROM clients WHERE client_email = %s AND confirmation_code = %s", (email, code))
+        user = cur.fetchone()
+        
     if user:
         # Update the confirmed column value to 1 for this user
         with cnx.cursor(dictionary=True) as cur:
@@ -373,7 +369,6 @@ def confirm_email():
             cnx.commit()
 
     
-
         return render_template('confirm_email.html')
     else:
         return 'Please confirm your email'
@@ -489,7 +484,14 @@ def update_database():
 
 @app.route('/update_profile', methods=['POST'])
 def update_profile():
-    
+    config = {
+        'user': 'root',
+        'password': 'myorbdbpass',
+        'host': 'localhost',
+        'database': "Oneredbox"
+    }
+    pcnx = mysql.connector.connect(**config)
+
     phoneNumber = request.form.get('phoneNumber')
     file = request.files.get('profilePic')
 
@@ -506,11 +508,11 @@ def update_profile():
             img.save(filepath, optimize=True, quality=50)
 
         # Update the user's profile with the new data
-        with cnx.cursor(dictionary=True) as cur:
+        with pcnx.cursor(dictionary=True) as cur:
             cur.execute("UPDATE clients SET client_pic_path = %s, phone_number = %s WHERE client_id = %s", (filepath, phoneNumber, current_user.id))
-            cnx.commit()
+            pcnx.commit()
         # Close the connection after using it
-        cnx.close()
+        pcnx.close()
 
         return jsonify({"message": "Profile updated with phone number"})
 
@@ -527,21 +529,21 @@ def update_profile():
             img.save(filepath, optimize=True, quality=50)
 
         # Update the user's profile with the new data
-        with cnx.cursor(dictionary=True) as cur:
+        with pcnx.cursor(dictionary=True) as cur:
             cur.execute("UPDATE clients SET client_pic_path = %s WHERE client_id = %s", (filepath, current_user.id))
-            cnx.commit()
+            pcnx.commit()
         # Close the connection after using it
-        cnx.close()
+        pcnx.close()
 
         return jsonify({"message": "Profile picture updated"})
 
     elif phoneNumber:
         # Only phone number provided
-        with cnx.cursor(dictionary=True) as cur:
+        with pcnx.cursor(dictionary=True) as cur:
             cur.execute("UPDATE clients SET phone_number = %s WHERE client_id = %s", (phoneNumber, current_user.id))
-            cnx.commit()
+            pcnx.commit()
         # Close the connection after using it
-        cnx.close()
+        pcnx.close()
 
         return jsonify({"message": "Phone number updated"})
 
