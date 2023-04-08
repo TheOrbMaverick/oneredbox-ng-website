@@ -47,6 +47,7 @@
             </div>
         </aside>
         <main>
+            <div id="paystackApiKey" style="display: none;">{{ paystackApiKey | tojson }}</div>
             <div id="unique-projects-data" style="display: none;">{{ unique_projects | tojson }}</div>
             {% for project in unique_projects %}
             <br>

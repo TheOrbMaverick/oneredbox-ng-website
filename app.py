@@ -8,22 +8,24 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_mail import Mail, Message
 from flask import jsonify, flash, session
 from PIL import Image
+from dotenv import load_dotenv
 
 import re
 import os
-import json
 import bcrypt
 import random
 import string
 
-dbPass = os.environ.get('DB_PASS')
-mailPass = os.environ.get('MAIL_PASS')
-secretK = os.environ.get('SECRET_KEY')
+load_dotenv()
+dbPass = os.environ['DB_PASS']
+mailPass = os.environ['MAIL_PASS']
+secretK = os.environ['SECRET_KEY']
+paystackApiKey = os.environ['PAYSTACK_API_KEY']
 
 #specified the database here with and stored it in cnx
 config = {
     'user': 'root',
-    'password': 'myorbdbpass',
+    'password': dbPass,
     'host': 'localhost',
     'database': "Oneredbox"
 }
@@ -35,8 +37,8 @@ app.config['MAIL_SERVER'] = 'smtp.zoho.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
 app.config['MAIL_USERNAME'] = 'hello@oneredbox.ng'
-app.config['MAIL_PASSWORD'] = '1988247/Tj'
-app.secret_key = "mysecretkeyforORB"
+app.config['MAIL_PASSWORD'] = mailPass
+app.secret_key = secretK
 
 mail = Mail(app)
 
@@ -55,7 +57,7 @@ class User(UserMixin):
 def load_user(user_id):
     config = {
         'user': 'root',
-        'password': 'myorbdbpass',
+        'password': dbPass,
         'host': 'localhost',
         'database': "Oneredbox"
     }
@@ -212,7 +214,7 @@ def dashboard():
         profilepic = "images/white_circle.png"
 
     #write code to bring up an alert box if the project is empty.
-    return render_template("dashboard.html", unique_projects=unique_projects, name=name, profilepic = profilepic)
+    return render_template("dashboard.html", unique_projects=unique_projects, name=name, profilepic = profilepic, paystackApiKey = paystackApiKey)
 
 
 @app.route('/projects')
@@ -234,7 +236,7 @@ def get_current_user():
 def newproject():
     config = {
         'user': 'root',
-        'password': 'myorbdbpass',
+        'password': dbPass,
         'host': 'localhost',
         'database': "Oneredbox"
     }
@@ -486,7 +488,7 @@ def update_database():
 def update_profile():
     config = {
         'user': 'root',
-        'password': 'myorbdbpass',
+        'password': dbPass,
         'host': 'localhost',
         'database': "Oneredbox"
     }

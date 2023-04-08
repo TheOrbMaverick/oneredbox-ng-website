@@ -1,6 +1,5 @@
 var counter = 0;
 
-
 window.addEventListener('load', () => {
     const dashpage = document.querySelector("#dashboardpage");
     const indexpage = document.querySelector("#homepage");
@@ -23,6 +22,7 @@ window.addEventListener('load', () => {
 })
 
 function dashboardpage () {
+    const paystackApiKey = JSON.parse(document.getElementById("paystackApiKey").innerHTML);
     const themeToggler = document.querySelector(".theme_toggler")
     const addProjectbtn = document.querySelector(".add-product")
     const addProjectDialog = document.querySelector(".box")
@@ -279,7 +279,7 @@ function dashboardpage () {
 
                         let handler = PaystackPop.setup({
                             
-                            key: 'pk_test_07b310fb8ae27769a5269f48247fa5e59778b176', // Replace with your public key
+                            key: paystackApiKey, // Replace with your public key
                             email: user.email,
                             amount: payValue * 100,
                             ref: ''+Math.floor((Math.random() * 1000000000) + 1), // generates a pseudo-unique reference. Please replace with a reference you generated. Or remove the line entirely so our API will generate one for you
