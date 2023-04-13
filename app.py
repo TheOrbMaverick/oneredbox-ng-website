@@ -17,6 +17,7 @@ import random
 import string
 
 load_dotenv()
+dbPath = os.environ['MYSQL_CONFIG']
 dbPass = os.environ['DB_PASS']
 mailPass = os.environ['MAIL_PASS']
 secretK = os.environ['SECRET_KEY']
