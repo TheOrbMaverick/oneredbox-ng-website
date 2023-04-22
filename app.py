@@ -16,7 +16,12 @@ import bcrypt
 import random
 import string
 
+#DatabaseURL = 'postgres://rfzckfcuqbybha:89fe273f63cce61501fd3cb038b1285a5c360351614772b22378031d67704ea1@ec2-3-234-204-26.compute-1.amazonaws.com:5432/d3m81l3v65o3ut'
+ 
+app = Flask(__name__)
+
 load_dotenv()
+
 dbPath = os.environ['MYSQL_CONFIG']
 dbPass = os.environ['DB_PASS']
 mailPass = os.environ['MAIL_PASS']
@@ -32,8 +37,7 @@ config = {
 }
 
 cnx = mysql.connector.connect(**config)
- 
-app = Flask(__name__)
+
 app.config['MAIL_SERVER'] = 'smtp.zoho.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
@@ -56,21 +60,19 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    config = {
-        'user': 'root',
-        'password': dbPass,
-        'host': 'localhost',
-        'database': "Oneredbox"
-    }
-    lcnx = mysql.connector.connect(**config)
-
     id_query = "SELECT * FROM clients WHERE client_id = %s"
-    with lcnx.cursor(dictionary=True) as cur:
-        cur.execute(id_query, (user_id, ))
-        user = cur.fetchone()
+    try:
+        cnx = mysql.connector.connect(**config)
+        with cnx.cursor(dictionary=True) as cur:
+            cur.execute(id_query, (user_id, ))
+            user = cur.fetchone()
 
-    if user is not None:
-        return User(user['client_id'], user['client_email'], user['first_name'])
+        if user is not None:
+            return User(user['client_id'], user['client_email'], user['first_name'])
+    except mysql.connector.Error as err:
+        print(f"Error connecting to MySQL: {err}")
+    finally:
+        cnx.close()
 
 # a decorator with an index function in the decorator this whole section is called routing
 @app.route('/')
@@ -107,6 +109,8 @@ def login():
                 with cnx.cursor(dictionary=True) as cur:
                     cur.execute("UPDATE clients SET confirmation_code = %s WHERE client_email = %s", (confirmation_code, inputemail))
                     cnx.commit()
+                #close the connection
+                cnx.close()
 
                 confirm_link = url_for('confirm_email', email=email, code=confirmation_code, _external=True)
                 msg = Message('Please Confirm Your Email', sender='hello@oneredbox.ng', recipients=[email])
@@ -180,6 +184,7 @@ def dashboard():
     with cnx.cursor(dictionary=True) as cur:
         cur.execute(query, (current_user.id,))
         rv = cur.fetchall()
+    # Close the connection
 
     name = current_user.name
     unique_projects = []
@@ -214,6 +219,12 @@ def dashboard():
     else:
         profilepic = "images/white_circle.png"
 
+    # check if connection is open
+    # if cnx.is_connected():
+    #     print('Connection is open 4')
+    # else:
+    #     print('Connection is closed 4')
+
     #write code to bring up an alert box if the project is empty.
     return render_template("dashboard.html", unique_projects=unique_projects, name=name, profilepic = profilepic, paystackApiKey = paystackApiKey)
 
@@ -235,13 +246,6 @@ def get_current_user():
 
 @app.route('/newproject', methods = ['GET', 'POST'])
 def newproject():
-    config = {
-        'user': 'root',
-        'password': dbPass,
-        'host': 'localhost',
-        'database': "Oneredbox"
-    }
-    ncnx = mysql.connector.connect(**config)
 
     client_id = current_user.id
     email = current_user.email
@@ -290,23 +294,28 @@ def newproject():
 
     date_added = date.today()
 
-    #adding query to insert into database
-    with ncnx.cursor(dictionary=True) as cur:
-        cur.execute('''INSERT INTO projects (project_desc, contract_sum, amount_paid, commercial, t_wo_bath, t_w_bath, study, kitchen, livingRm, bedroom, total_sq_area, proj_image_path, date_added, client_id) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, null, %s, %s)''', (projDesc, totalCost, amountPaid, commercial, tWoBath, twBath, study, kitchen, livrm, bedroom, totalArea, date_added, client_id))
-        ncnx.commit()
-        # Get the project ID of the newly created project
-        project_id = cur.lastrowid
+    query1 = '''INSERT INTO projects 
+            (project_desc, contract_sum, amount_paid, commercial, t_wo_bath, t_w_bath, study, kitchen, livingRm, bedroom, total_sq_area, proj_image_path, date_added, client_id) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, null, %s, %s)'''
 
+    query2 = '''INSERT INTO updates 
+                (update_desc, proj_status, project_id) 
+                VALUES (%s, %s, %s)'''
 
-    # Insert a default update for the project
     update_desc = "Project brief created"
     proj_status = 0
 
-    with ncnx.cursor(dictionary=True) as cur:
-        cur.execute('''INSERT INTO updates (update_desc, proj_status, project_id) 
-                    VALUES (%s, %s, %s)''', (update_desc, proj_status, project_id))
-        ncnx.commit()
+    with mysql.connector.connect(user='root', password=dbPass, host='localhost', database='Oneredbox') as cnx:
+        # Insert the project
+        with cnx.cursor(dictionary=True) as cur:
+            cur.execute(query1, (projDesc, totalCost, amountPaid, commercial, tWoBath, twBath, study, kitchen, livrm, bedroom, totalArea, date_added, client_id))
+            project_id = cur.lastrowid
+
+        # Insert a default update for the project
+        with cnx.cursor(dictionary=True) as cur:
+            cur.execute(query2, (update_desc, proj_status, project_id))
+
+        cnx.commit()
 
     # Send a confirmation email to the user
     msg = Message('Your new project', sender='hello@oneredbox.ng', recipients=[email])
@@ -327,7 +336,6 @@ def newproject():
 
     msg.body = re.sub(r'^( {4})+', '', msg.body, flags=re.MULTILINE)
     mail.send(msg)
-    ncnx.close()
 
     # Redirect user to dashboard
     return redirect(url_for('dashboard'))
@@ -487,13 +495,6 @@ def update_database():
 
 @app.route('/update_profile', methods=['POST'])
 def update_profile():
-    config = {
-        'user': 'root',
-        'password': dbPass,
-        'host': 'localhost',
-        'database': "Oneredbox"
-    }
-    pcnx = mysql.connector.connect(**config)
 
     phoneNumber = request.form.get('phoneNumber')
     file = request.files.get('profilePic')
@@ -511,11 +512,11 @@ def update_profile():
             img.save(filepath, optimize=True, quality=50)
 
         # Update the user's profile with the new data
-        with pcnx.cursor(dictionary=True) as cur:
+        with cnx.cursor(dictionary=True) as cur:
             cur.execute("UPDATE clients SET client_pic_path = %s, phone_number = %s WHERE client_id = %s", (filepath, phoneNumber, current_user.id))
-            pcnx.commit()
+            cnx.commit()
         # Close the connection after using it
-        pcnx.close()
+        cnx.close()
 
         return jsonify({"message": "Profile updated with phone number"})
 
@@ -532,21 +533,21 @@ def update_profile():
             img.save(filepath, optimize=True, quality=50)
 
         # Update the user's profile with the new data
-        with pcnx.cursor(dictionary=True) as cur:
+        with cnx.cursor(dictionary=True) as cur:
             cur.execute("UPDATE clients SET client_pic_path = %s WHERE client_id = %s", (filepath, current_user.id))
-            pcnx.commit()
+            cnx.commit()
         # Close the connection after using it
-        pcnx.close()
+        cnx.close()
 
         return jsonify({"message": "Profile picture updated"})
 
     elif phoneNumber:
         # Only phone number provided
-        with pcnx.cursor(dictionary=True) as cur:
+        with cnx.cursor(dictionary=True) as cur:
             cur.execute("UPDATE clients SET phone_number = %s WHERE client_id = %s", (phoneNumber, current_user.id))
-            pcnx.commit()
+            cnx.commit()
         # Close the connection after using it
-        pcnx.close()
+        cnx.close()
 
         return jsonify({"message": "Phone number updated"})
 
@@ -568,7 +569,8 @@ def logout():
 #if the name arugment is same as main run the app
 if __name__ == "__main__":
     app.config['UPLOAD_FOLDER'] = 'static/userpics'
-    app.run(host="0.0.0.0", port=3000)
+    app.run(debug=True)
+    #app.run(host="0.0.0.0", port=3000)
 
 
 '''
