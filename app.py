@@ -36,6 +36,7 @@ config = {
     'database': "Oneredbox"
 }
 
+
 cnx = mysql.connector.connect(**config)
 
 app.config['MAIL_SERVER'] = 'smtp.zoho.com'
